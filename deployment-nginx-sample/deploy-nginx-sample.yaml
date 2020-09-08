@@ -1,3 +1,10 @@
+# This demonstrates how to run a deployment of 3 nginx containers.
+# How to run this demo:
+#  Connect kubectl to a running cluster (minikube will do)
+#  kubectl apply -f deploy-nginx-sample.yaml
+#  kubectl expose deployment nginx-deployment --type=LoadBalancer --port=8080
+#  on minikube:  run "minikube service nginx-deployment"
+#  TODO: DOES NOT WORK ON MINIKUBE WITH NGINX:LATEST, BUT DOES WORK WITH K8S.GCR.IO/ECHOSERVER:1.4
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,6 +23,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:1.14.2
-        ports:
-        - containerPort: 80
+        #image: nginx:latest
+        image: k8s.gcr.io/echoserver:1.4
+        #ports:
+        #- containerPort: 80

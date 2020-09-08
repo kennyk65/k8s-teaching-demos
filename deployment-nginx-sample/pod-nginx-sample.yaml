@@ -1,0 +1,18 @@
+# This demonstrates how to run a pod with a single nginx container.
+# How to run this demo:
+#  Connect kubectl to a running cluster (minikube will do)
+#  kubectl apply -f pod-nginx-sample.yaml
+#  kubectl expose pod basicpod --type=LoadBalancer --port=8080
+#  on minikube:  run "minikube service basicpod"
+#  TODO: DOES NOT WORK ON MINIKUBE WITH NGINX:LATEST, BUT DOES WORK WITH K8S.GCR.IO/ECHOSERVER:1.4
+apiVersion: v1
+kind: Pod
+metadata:
+  name: basicpod
+  labels:
+    type: webserver
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+    #image: k8s.gcr.io/echoserver:1.4
