@@ -2,8 +2,8 @@
 # How to run this demo:
 #  Connect kubectl to a running cluster (minikube will do)
 #  kubectl apply -f pod-nginx-sample.yaml
-#  kubectl expose pod basicpod --type=NodePort --port=80
-#    kubectl create service nodeport mynginxapp --tcp=80
+####  kubectl expose pod basicpod --type=NodePort --port=80
+#  kubectl create service nodeport mynginxapp --tcp=80
 #  on minikube:  run "minikube service mynginxapp"
 # Clean Up:
 #  kubectl delete service mynginxapp
