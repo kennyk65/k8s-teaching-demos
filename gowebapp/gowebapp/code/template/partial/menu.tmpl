@@ -1,0 +1,11 @@
+{{if eq .AuthLevel "auth"}}
+
+<a href="{{.BaseURI}}notepad" class="nav-link"><span class="nav-text">Notes</span></a>
+<a href="{{.BaseURI}}logout" class="nav-link"><span class="nav-text">Logout</span></a>
+
+{{else}}
+
+<a href="{{.BaseURI}}register" class="nav-link"><span class="nav-text">Register</span></a>
+<a href="{{.BaseURI}}login" class="nav-link"><span class="nav-text">Login</span></a>
+
+{{end}}
