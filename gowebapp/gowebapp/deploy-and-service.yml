@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-#TODO: define the kind of object as Deployment
+#TODO: define the kind of object as Deployment 
 kind: Deployment
 metadata: 
   #TODO: give the deployment a name name: gowebapp
