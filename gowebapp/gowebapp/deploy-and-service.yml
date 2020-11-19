@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+#TODO: define the kind of object as Deployment
+type: Deployment
+metadata: 
+  #TODO: give the deployment a name name: gowebapp
+  name: gowebapp
+  labels:
+    #TODO: give the Deployment a label: app: gowebapp
+    #TODO: give the Deployment a label: tier: frontend
+    app: gowebapp
+    tier: frontend
+spec:
+  #TODO: set replicas to 2
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gowebapp
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: gowebapp
+        tier: frontend
+    spec:
+      containers:
+      - name: gowebapp
+        env:
+        - #TODO: define name as MYSQL_ROOT_PASSWORD
+          #TODO: define value as mypassword
+          name: MYSQL_ROOT_PASSWORD
+          value: mypassword
+        image: localhost:5000/gowebapp:v1
+        ports:
+        - #TODO: define the container port as 80
+          containerPort: 80
+---
+apiVersion: v1
+#TODO: define the kind of object as Service
+type: Service
+metadata: 
+  #TODO: give the Service a name: gowebapp
+  name: gowebapp
+  labels:
+    #TODO: give the Service a label: app: gowebapp
+    #TODO: give the Service a label: tier: frontend
+    app: gowebapp
+    tier: frontend
+spec:
+  #TODO: Set service type to NodePort
+  type: NodePort
+  ports:
+  - #TODO: expose port 80
+    port: 80
+  selector:
+    #TODO: define a selector: app: gowebapp
+    #TODO: define a selector: tier: frontend
+    app: gowebapp
+    tier: frontend
