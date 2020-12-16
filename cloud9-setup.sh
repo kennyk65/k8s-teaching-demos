@@ -1,6 +1,8 @@
 #!/bin/bash
-read -p 'Enter cluster name: ' Cluster
-read -p 'Enter region: ' Region
+read -p 'Enter cluster name [MyCluster]: ' Cluster
+read -p 'Enter region [us-west-2]: ' Region
+Cluster=${Cluster:-MyCluster}
+Region=${Region:-us-west-2}
 
 # eksctl
 echo Installing eksctl
