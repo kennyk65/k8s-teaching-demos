@@ -1,0 +1,11 @@
+# Create a new RBAC role called web-admins-role in web namespace.
+# The role is quite powerful
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+ name: web-admins-role
+ namespace: web
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
