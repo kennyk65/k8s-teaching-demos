@@ -1,16 +1,15 @@
 #!/bin/bash
-AWS_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
-read -p 'Enter region ['${AWS_REGION}']: ' TEMP
+read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
-AWS_REGION=${TEMP:-${AWS_REGION}}
+AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
 
 # Set region
 echo Setting region to $AWS_REGION
 aws configure set region $AWS_REGION
 
 # Kubectl
-echo Checking if kubectl is installed
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
@@ -19,7 +18,7 @@ then
     sudo mv ./kubectl /usr/local/bin
     kubectl version --short --client
 else
-    echo kubectl is already installed.
+    echo Looks like kubectl is already installed.
 fi
 
 # Configure kubeconfig
@@ -27,7 +26,6 @@ echo Configuring kubeconfig file for cluster $CLUSTER_NAME
 aws eks update-kubeconfig --name $CLUSTER_NAME
 
 # eksctl
-echo Checking if eksctl is installed
 if ! command -v eksctl &> /dev/null
 then
     echo Installing eksctl
@@ -35,10 +33,9 @@ then
     sudo mv /tmp/eksctl /usr/local/bin
     eksctl version
 else
-    echo eksctl is already installed.
+    echo Looks like eksctl is already installed.
 fi
 
-echo Checking if helm is installed
 if ! command -v helm &> /dev/null
 then
     echo Installing Helm
@@ -47,7 +44,7 @@ then
     ./get_helm.sh
     chmod go-r ~/.kube/config
 else
-    echo Helm is already installed.
+    echo Looks like Helm is already installed.
 fi
 
 # Preupgrade check
