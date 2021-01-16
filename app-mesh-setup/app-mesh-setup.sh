@@ -1,8 +1,10 @@
 #!/bin/bash
+AWS_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+echo $AWS_REGION
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
-read -p 'Enter region [us-west-2]: ' AWS_REGION
+read -p 'Enter region [$AWS_REGION]: ' AWS_REGION
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
-AWS_REGION=${AWS_REGION:-us-west-2}
+#AWS_REGION=${AWS_REGION:-us-west-2}
 
 # Set region
 echo Setting region to $AWS_REGION
@@ -25,11 +27,17 @@ fi
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
 aws eks update-kubeconfig --name $CLUSTER_NAME
 
-
-# Preupgrade check
-echo checking your cluster
-curl -o pre_upgrade_check.sh https://raw.githubusercontent.com/aws/eks-charts/master/stable/appmesh-controller/upgrade/pre_upgrade_check.sh
-./pre_upgrade_check.sh
+# eksctl
+echo Checking if eksctl is installed
+if ! command -v eksctl &> /dev/null
+then
+    echo Installing eksctl
+    curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+    sudo mv /tmp/eksctl /usr/local/bin
+    eksctl version
+else
+    echo eksctl is already installed.
+fi
 
 echo Checking if helm is installed
 if ! command -v helm &> /dev/null
@@ -43,6 +51,12 @@ else
     echo Helm is already installed.
 fi
 
+# Preupgrade check
+echo checking your cluster
+curl -o pre_upgrade_check.sh https://raw.githubusercontent.com/aws/eks-charts/master/stable/appmesh-controller/upgrade/pre_upgrade_check.sh
+./pre_upgrade_check.sh
+
+
 echo Adding Helm repository for EKS:
 helm repo add eks https://aws.github.io/eks-charts
 
@@ -51,18 +65,6 @@ kubectl apply -k "https://github.com/aws/eks-charts/stable/appmesh-controller/cr
 
 echo Creating appmesh-system namespace
 kubectl create ns appmesh-system
-
-# eksctl
-echo Checking if eksctl is installed
-if ! command -v eksctl &> /dev/null
-then
-    echo Installing eksctl
-    curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-    sudo mv /tmp/eksctl /usr/local/bin
-    eksctl version
-else
-    echo eksctl is already installed.
-fi
 
 echo Creating OIDC provider
 eksctl utils associate-iam-oidc-provider \
@@ -85,7 +87,6 @@ helm upgrade -i appmesh-controller eks/appmesh-controller \
     --set region=$AWS_REGION \
     --set serviceAccount.create=false \
     --set serviceAccount.name=appmesh-controller
-
 
 kubectl get deployment appmesh-controller \
     -n appmesh-system \
