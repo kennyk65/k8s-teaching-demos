@@ -1,10 +1,9 @@
 #!/bin/bash
 AWS_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
-echo $AWS_REGION
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
-read -p 'Enter region [$AWS_REGION]: ' AWS_REGION
+read -p 'Enter region ['${AWS_REGION}']: ' TEMP
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
-#AWS_REGION=${AWS_REGION:-us-west-2}
+AWS_REGION=${TEMP:-${AWS_REGION}}
 
 # Set region
 echo Setting region to $AWS_REGION
