@@ -1,4 +1,5 @@
 #!/bin/bash
+cd ~
 
 # Kubectl
 if ! command -v kubectl &> /dev/null
@@ -28,9 +29,8 @@ fi
 if ! command -v minikube &> /dev/null
 then
     echo Installing minikube
-    curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
-    chmod +x ./minikube
-    sudo mv ./minikube /usr/local/bin/
+    curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+    sudo install minikube-linux-amd64 /usr/local/bin/minikube    
 else
     echo Looks like minikube is already installed.
 fi
@@ -38,6 +38,5 @@ minikube version
 
 
 # Start minikube
-sudo -i
 minikube start --vm-driver=none
 minikube status
