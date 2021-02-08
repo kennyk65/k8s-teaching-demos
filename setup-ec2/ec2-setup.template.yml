@@ -1,0 +1,97 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+# This downloads and runs a Spring Boot app on an EC2 instance.  This is a minimalistic approach, it does not run as a service.
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "Please supply the following"
+        Parameters: 
+          - VPC
+          - PublicSubnet
+          - PrivateKeyName
+          - LinuxAMI
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC, one with public subnets
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Select a public subnet in your selected VPC.  The web server will run here.
+
+  PrivateKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: The name of the private key file to use for SSH/RDP access to the instance, if needed.
+
+  LinuxAMI:
+    Type:  AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/18.04/stable/current/amd64/hvm/ebs-gp2/ami-id 
+    Description: You probably won't need to change this value.  This is looking up Ubuntu 18.04 AMI using the Parameter Store...
+
+
+Resources:
+
+  # Security Group for the server.  Allow SSH from anywhere:
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Web server
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: WebServerSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LinuxAMI                # Latest Amazon Linux 2
+      InstanceType: t3.micro                      # Any instance type will do
+      IamInstanceProfile: !Ref SSMInstanceProfile     # Allows EC2 Instance to talk with SSM
+      KeyName: !Ref PrivateKeyName                                    # We get the keypair name from the input parameters
+      NetworkInterfaces:
+      - DeviceIndex: 0
+        AssociatePublicIpAddress: true            # We will need a public IP address
+        SubnetId: !Ref PublicSubnet               # We should sit in a public subnet.
+        GroupSet: [ !Ref ServerSecurityGroup ] # Attach the security group
+      UserData:      #  This code installs the LDF459 class content:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          wget https://training.linuxfoundation.org/cm/prep/ready-for.sh
+          chmod 755 ready-for.sh
+          ./ready-for.sh LFD459
+        
+  # Attach AmazonEC2RoleforSSM's permissions to each EC2 Instance in the ASG.
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [ !Ref SSMRole]
+
+  # Allow EC2 instance to make calls to SSM.
+  SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+
+# Finally, what we should see when we are all done.  IP address of our website:
+Outputs:
+  WebServerIpAddress:
+    Description: IP Address of the web server
+    Value: !Sub http://${Server.PublicIp}
