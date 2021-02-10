@@ -2,6 +2,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 # This sets up minikube on an EC2 instance.
+# Note: The instance does not start minikube, you must do this yourself by running the following commands:
+#   sudo -i
+#   minikube start --vm-driver=none
+#   kubectl config view
+# Also, Session Manager on Ubuntu runs /bin/sh instead of /bin/bash, so to get up arrow, tab behavior, run "bash"
 
 Metadata: 
   AWS::CloudFormation::Interface: 
