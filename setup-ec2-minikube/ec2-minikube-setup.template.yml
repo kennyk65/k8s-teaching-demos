@@ -1,0 +1,158 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+# This sets up minikube on an EC2 instance.
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "Please supply the following"
+        Parameters: 
+          - VPC
+          - PublicSubnet
+          - PrivateKeyName
+          - LinuxAMI
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC, one with public subnets
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Select a public subnet in your selected VPC.  The server will run here.
+
+  PrivateKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: The name of the private key file to use for SSH/RDP access to the instance, if needed.
+
+  LinuxAMI:
+    Type:  AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/18.04/stable/current/amd64/hvm/ebs-gp2/ami-id 
+    Description: You probably won't need to change this value.  This is looking up Ubuntu 18.04 AMI using the Parameter Store...
+
+
+Resources:
+
+  # Security Group for the server.  Allow SSH from anywhere:
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for server
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: MinikubeSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+
+
+  LaunchTemplateMinikube:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: !Sub ${AWS::StackName}-MinikubeTemplate
+      LaunchTemplateData: 
+        IamInstanceProfile: 
+          Name: !Ref SSMInstanceProfile  # Allows EC2 Instance to talk with SSM
+        ImageId: !Ref LinuxAMI             # Latest Ubuntu
+        InstanceType: t3.xlarge              # Need a lot of RAM and CPU
+        KeyName: !Ref PrivateKeyName           # We get the keypair name from the input parameters
+        NetworkInterfaces:
+        - DeviceIndex: 0
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet           # You have to specify a subnet in this launch template, but this will be ignored when using ASG.
+          Groups: [!Ref ServerSecurityGroup]       # Plug in the security group.
+        InstanceMarketOptions: 
+          MarketType: spot
+        BlockDeviceMappings: 
+        - DeviceName: "/dev/xvdf"
+          Ebs:
+            VolumeSize: 25
+            VolumeType: gp2
+        UserData:   #  This code installs Minikube:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # Instructions from https://www.radishlogic.com/kubernetes/running-minikube-in-aws-ec2-ubuntu/
+            # Kubectl
+            if ! command -v kubectl &> /dev/null
+            then
+                echo Installing Kubectl
+                curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+                chmod +x ./kubectl
+                sudo mv ./kubectl /usr/local/bin
+            else
+                echo Looks like kubectl is already installed.
+            fi
+            kubectl version --short --client
+            # Docker
+            if ! command -v docker &> /dev/null
+            then
+                echo Installing Docker
+                apt-get update -y
+                apt-get install docker.io -y
+            else
+                echo Looks like Docker is already installed.
+            fi
+            docker -v
+            # Minikube
+            if ! command -v minikube &> /dev/null
+            then
+                echo Installing Minikube
+                curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 
+                chmod +x minikube
+                mv minikube /usr/local/bin/
+            else
+                echo Looks like Minikube is already installed.
+            fi
+            minikube version
+            echo Installing conntrack - needed by Minikube
+            apt-get install conntrack         
+            # echo Starting minikube COMMENTED OUT BECAUSE STARTING MINIKUBE LIKE THIS MESSES UP PERMISSIONS
+            # sudo -i
+            # minikube start --vm-driver=none
+            #wget https://training.linuxfoundation.org/cm/prep/ready-for.sh
+            #chmod 755 ready-for.sh
+            #./ready-for.sh LFD459
+
+  AppAutoScalingGroupMinikube:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: [ !Ref PublicSubnet ]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplateMinikube
+        Version: !GetAtt LaunchTemplateMinikube.LatestVersionNumber  
+      MinSize: 1
+      MaxSize: 1
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 300
+      Tags:
+      - Key: Name
+        Value: Minikube
+        PropagateAtLaunch: true
+
+  # Attach AmazonEC2RoleforSSM's permissions to each EC2 Instance in the ASG.
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [ !Ref SSMRole]
+
+  # Allow EC2 instance to make calls to SSM.
+  SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+
+
