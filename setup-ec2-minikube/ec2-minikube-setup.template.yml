@@ -54,6 +54,10 @@ Resources:
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp   # open high order ports to accomodate NodePort services
+        FromPort: 30000
+        ToPort: 60000
+        CidrIp: 0.0.0.0/0
 
 
   LaunchTemplateMinikube:
@@ -81,6 +85,9 @@ Resources:
         UserData:   #  This code installs Minikube:
           Fn::Base64: !Sub |
             #!/bin/bash
+            # SSM Agent is pre-installed, but we need a newer version to run bash;
+            snap switch --channel=candidate amazon-ssm-agent
+            snap refresh            
             # Instructions from https://www.radishlogic.com/kubernetes/running-minikube-in-aws-ec2-ubuntu/
             # Kubectl
             if ! command -v kubectl &> /dev/null
