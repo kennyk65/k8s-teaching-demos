@@ -5,7 +5,8 @@ metadata:
   labels:
     app: myapp
 spec:
-  replicas: 3
+  # Notice that number of replicas is controlled via helm:
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: myapp
