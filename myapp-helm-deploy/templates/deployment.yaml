@@ -16,6 +16,7 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: 011673140073.dkr.ecr.us-west-2.amazonaws.com/myapp:1
+        # Notice that actual value for image and tag is set dynamically by helm:
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}        
         ports:
         - containerPort: 80
