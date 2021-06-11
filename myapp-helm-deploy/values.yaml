@@ -5,7 +5,7 @@
 replicaCount: 3
 
 image:
-  repository: 011673140073.dkr.ecr.us-west-2.amazonaws.com/myapp
+  repository: 011673140073.dkr.ecr.us-west-2.amazonaws.com/spring-cloud-aws-environment-demo
   tag: 1
   pullPolicy: IfNotPresent
 
