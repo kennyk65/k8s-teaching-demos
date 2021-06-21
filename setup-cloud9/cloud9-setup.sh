@@ -28,7 +28,7 @@ kubectl version --short --client
 # Configure kubeconfig
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
 #aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
-aws eks update-kubeconfig --name $CLUSTER_NAME --alias admin --region $AWS_REGION
+aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
 # eksctl
 if ! command -v eksctl &> /dev/null
