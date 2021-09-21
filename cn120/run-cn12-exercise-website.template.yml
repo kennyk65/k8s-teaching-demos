@@ -1,0 +1,97 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+# This Stack runs the exercise site for Mirantis CN-120
+# Instructions:
+# Go to https://github.com/docker-training/cnc-presentations/releases.  Find latest release, like "cnc-2.7.0"
+# Download the file for your class, like cn120-exercises-cnc-2.7.0.tgz or something.
+# Upload this file to S3:     
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "Please supply the following"
+        Parameters: 
+          - VPC
+          - PublicSubnet
+          - DockerImage
+          - AmazonLinuxAMI
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC, one with public subnets
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Select a public subnet in your selected VPC.  The web server will run here.
+
+  DockerImage:
+    Type: String
+    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/cn120-exercises-cnc-2.7.0.tgz
+    Description: Image to use for a container.  Expected to be a tgz file with a docker image inside. 
+
+  AmazonLinuxAMI:
+    Type:  AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: You probably won't need to change this value.  This is looking up the latest Amazon Linux 2 AMI using the Parameter Store...
+
+
+Resources:
+
+  # Security Group for the web server.  Allow HTTP and SSH from anywhere:
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Web server
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: WebServerSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 8000
+        ToPort: 8000
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 8888
+        ToPort: 8888
+        CidrIp: 0.0.0.0/0
+
+  # web server:
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmazonLinuxAMI                # Latest Amazon Linux 2
+      InstanceType: t2.micro                      # Any instance type will do
+      NetworkInterfaces:
+      - DeviceIndex: 0
+        AssociatePublicIpAddress: true            # We will need a public IP address
+        SubnetId: !Ref PublicSubnet               # We should sit in a public subnet.
+        GroupSet: [ !Ref WebServerSecurityGroup ] # Attach the security group
+      UserData:      #  This code installs a Docker app and runs it.  It assumes the app listens on 8080, which must be mapped to the instance's 80
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y docker
+          service docker start
+          curl -o image.tgz ${DockerImage}
+          docker image load -i image.tgz
+          docker container run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock mirantistraining/docker-present:cnc-2.7.0 -p 8000
+          docker container run --rm -d -p 8888:80 mirantistraining/cn120-exercises:cnc-2.7.0
+          /opt/aws/bin/cfn-signal --resource WebServer --stack ${AWS::StackName}  --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT3M
+        
+# Finally, what we should see when we are all done.  IP address of our website:
+Outputs:
+  WebServerIpAddress:
+    Description: IP Address of the web server
+    Value: !Sub http://${WebServer.PublicIp}
