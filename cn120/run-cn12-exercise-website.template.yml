@@ -5,7 +5,8 @@ AWSTemplateFormatVersion: '2010-09-09'
 # Instructions:
 # Go to https://github.com/docker-training/cnc-presentations/releases.  Find latest release, like "cnc-2.7.0"
 # Download the file for your class, like cn120-exercises-cnc-2.7.0.tgz or something.
-# Upload this file to S3:     
+# Upload this file to S3 (too large for github):  s3://kk-courses/k8s-cn120/ 
+# Run this cloudformation tempate in any region  
 
 Metadata: 
   AWS::CloudFormation::Interface: 
@@ -58,10 +59,6 @@ Resources:
         FromPort: 8000
         ToPort: 8000
         CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 8888
-        ToPort: 8888
-        CidrIp: 0.0.0.0/0
 
   # web server:
   WebServer:
@@ -82,8 +79,8 @@ Resources:
           service docker start
           curl -o image.tgz ${DockerImage}
           docker image load -i image.tgz
-          docker container run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock mirantistraining/docker-present:cnc-2.7.0 -p 8000
-          docker container run --rm -d -p 8888:80 mirantistraining/cn120-exercises:cnc-2.7.0
+          # docker container run --rm -d -p 8000:8000 -v /var/run/docker.sock:/var/run/docker.sock mirantistraining/docker-present:cnc-2.7.0 
+          docker container run --rm -d -p 80:80 mirantistraining/cn120-exercises:cnc-2.7.0
           /opt/aws/bin/cfn-signal --resource WebServer --stack ${AWS::StackName}  --region ${AWS::Region}
     CreationPolicy:
       ResourceSignal:
@@ -92,6 +89,6 @@ Resources:
         
 # Finally, what we should see when we are all done.  IP address of our website:
 Outputs:
-  WebServerIpAddress:
+  StudentExerciseInstructionsWebServer:
     Description: IP Address of the web server
-    Value: !Sub http://${WebServer.PublicIp}
+    Value: !Sub http://${WebServer.PublicIp}:80
