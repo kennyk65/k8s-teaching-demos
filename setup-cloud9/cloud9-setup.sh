@@ -1,13 +1,13 @@
 #!/bin/bash
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 TEMP_ACCOUNT=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
-TEMP_ROLEARN=arn:aws:sts::$TEMP_ACCOUNT:assumed-role/EksClusterCreatorRole
+TEMP_ROLEARN=arn:aws:iam::$TEMP_ACCOUNT:role/EksClusterCreatorRole
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
 read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
-#read -p 'Enter Role ARN of cluster creator ['${TEMP_ROLEARN}']: ' AWS_ROLEARN
+read -p 'Enter Role ARN of cluster creator ['${TEMP_ROLEARN}']: ' AWS_ROLEARN
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
 AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
-#AWS_ROLEARN=${AWS_ROLEARN:-${TEMP_ROLEARN}}
+AWS_ROLEARN=${AWS_ROLEARN:-${TEMP_ROLEARN}}
 
 # Set region
 echo Setting region to $AWS_REGION
@@ -17,7 +17,6 @@ aws configure set region $AWS_REGION
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
-    # curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.17.9/2020-08-04/bin/linux/amd64/kubectl
     curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl    
     chmod +x ./kubectl
     sudo mv ./kubectl /usr/local/bin
@@ -28,8 +27,8 @@ kubectl version --short --client
 
 # Configure kubeconfig
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
-#aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
-aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
+#aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
 # eksctl
 if ! command -v eksctl &> /dev/null
@@ -56,4 +55,3 @@ fi
 # Display your current identity in the log 
 echo Displaying current identity
 aws sts get-caller-identity 
-
