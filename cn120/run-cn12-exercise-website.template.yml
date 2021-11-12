@@ -3,21 +3,33 @@ AWSTemplateFormatVersion: '2010-09-09'
 
 # This Stack runs the exercise site for Mirantis CN-120
 # Instructions:
-# Go to https://github.com/docker-training/cnc-presentations/releases.  Find latest release, like "cnc-2.7.0"
-# Download the file for your class, like cn120-exercises-cnc-2.7.0.tgz or something.
-# Upload this file to S3 (too large for github):  s3://kk-courses/k8s-cn120/ 
-# Run this cloudformation tempate in any region  
+# Go to https://github.com/docker-training/cnc-presentations/releases.  
+# Identify the latest release, like "cnc-2.9.0"
+# Adjust the parameters when you run this template.  Run in any region.
 
-Metadata: 
-  AWS::CloudFormation::Interface: 
-    ParameterGroups: 
-      - Label: 
-          default: "Please supply the following"
+# This Stack runs the exercise site for Mirantis CN-120
+# Instructions:
+# Go to https://github.com/docker-training/cnc-presentations/releases.  Find latest release, like "cnc-2.9.0"
+# Download the tgz files for exercises and slides, like cn120-exercises-cnc-2.9.0.tgz and slides-cnc-2.7.0.tgz  or something.
+# Upload these files to S3 kk-courses:  s3://kk-courses/k8s-cn120/ 
+# (We must download/upload because the Mirantis GitHub repo is not public)
+# Run this cloudformation tempate in any region, adjust parameters to match downloads  
+
+Metadata:
+  # Controlling the order of the parameters on the CloudFormation page;
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Network
         Parameters: 
           - VPC
           - PublicSubnet
-          - DockerImage
-          - AmazonLinuxAMI
+      - Label:
+          default: Mirantis Downloads and Images
+        Parameters:
+          - SlidesDockerImageDownload
+          - ExercisesDockerImageDownload
+          - ExercisesDockerImageName
 
 Parameters:
   VPC:
@@ -28,14 +40,19 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
     Description: Select a public subnet in your selected VPC.  The web server will run here.
 
-  DockerImageExercises:
+  ExercisesDockerImageDownload:
     Type: String
-    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/cn120-exercises-cnc-2.7.0.tgz
+    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/cn120-exercises-cnc-2.9.0.tgz
     Description: Image to use for the docker container to host the exercise files.  Expected to be a tgz file with a docker image inside. 
 
-  DockerImageSlides:
+  ExercisesDockerImageName:
     Type: String
-    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/slides-cnc-2.7.0.tgz
+    Default: mirantistraining/cn120-exercises:cnc-2.9.0
+    Description: Docker image name contained within the tgz file. 
+
+  SlidesDockerImageDownload:
+    Type: String
+    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/slides-cnc-2.9.0.tgz
     Description: Image to use for the docker container to host the slide presentation.  Expected to be a tgz file with a docker image inside. 
 
   AmazonLinuxAMI:
@@ -71,6 +88,7 @@ Resources:
     Properties:
       ImageId: !Ref AmazonLinuxAMI                # Latest Amazon Linux 2
       InstanceType: t2.micro                      # Any instance type will do
+      IamInstanceProfile: !Ref SSMInstanceProfile     # Allows EC2 Instance to talk with SSM
       NetworkInterfaces:
       - DeviceIndex: 0
         AssociatePublicIpAddress: true            # We will need a public IP address
@@ -80,21 +98,47 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           yum update -y
+          # SSM Agent, for debugging:
+          yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+          start amazon-ssm-agent
+          # install docker:
           yum install -y docker
           service docker start
-          curl -o image-exercises.tgz ${DockerImageExercises}
-          curl -o image-slides.tgz ${DockerImageSlides}
+          curl -o image-exercises.tgz ${ExercisesDockerImageDownload}
+          curl -o image-slides.tgz ${SlidesDockerImageDownload}
           docker image load -i image-exercises.tgz
           # docker image load -i image-slides.tgz
           # docker container run --rm -d -p 8000:8000 -v /var/run/docker.sock:/var/run/docker.sock mirantistraining/docker-present:cnc-2.7.0 
           # COMMENTED OUT because this container prompts the runner for which course to run.  Need to figure out.
-          docker container run --rm -d -p 80:80 mirantistraining/cn120-exercises:cnc-2.7.0
+          docker container run --rm -d -p 80:80 ${ExercisesDockerImageName}
           /opt/aws/bin/cfn-signal --resource WebServer --stack ${AWS::StackName}  --region ${AWS::Region}
     CreationPolicy:
       ResourceSignal:
         Count: 1
-        Timeout: PT3M
+        Timeout: PT5M
         
+  # Attach AmazonEC2RoleforSSM's permissions to each EC2 Instance in the ASG.
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [ !Ref SSMRole]
+
+  # Allow EC2 instance to make calls to SSM.
+  SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      # Note that any other policies required for the instance to do its job would be defined here as well.  
+
+
 # Finally, what we should see when we are all done.  IP address of our website:
 Outputs:
   StudentExerciseInstructionsWebServer:
