@@ -50,6 +50,7 @@ fi
 
 
 # Create cluster using eksctl.  Expect this to wait even after CloudFormation is finished.
+# The withOIDC setting is interesting.  Karpenter will run in a pod and needs to make AWS API calls.
 cat <<EOF > cluster.yaml
 ---
 apiVersion: eksctl.io/v1alpha5
@@ -59,7 +60,7 @@ metadata:
   region: ${AWS_DEFAULT_REGION}
   version: "1.21"
 managedNodeGroups:
-  - instanceType: m5.large
+  - instanceType: t3.small
     amiFamily: AmazonLinux2
     name: ${CLUSTER_NAME}-ng
     desiredCapacity: 1
@@ -79,7 +80,7 @@ aws ec2 create-tags \
     --resources $(echo $SUBNET_IDS | tr ',' '\n') \
     --tags Key="kubernetes.io/cluster/${CLUSTER_NAME}",Value=
 
-# This is creating an IAM Role to be used by the new Nodes.  Looks like karpenter doesn't use ASG.
+# This is creating an IAM Role to be used by the new Nodes.  Looks like karpenter doesn't use ASG (by default at least).
 TEMPOUT=$(mktemp)
 curl -fsSL https://karpenter.sh/docs/getting-started/cloudformation.yaml > $TEMPOUT \
 && aws cloudformation deploy \
@@ -112,7 +113,7 @@ helm upgrade --install karpenter karpenter/karpenter --namespace karpenter \
   --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.endpoint" --output json) \
   --wait # for the defaulting webhook to install before creating a Provisioner
 
-# Create a 'provisioner':
+# Create a 'provisioner'.  Note this one is using spot instances:
 cat <<EOF | kubectl apply -f -
 apiVersion: karpenter.sh/v1alpha5
 kind: Provisioner
