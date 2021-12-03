@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# Stand up an EKS cluster backed by Amazon Linux instances.  
+
+Parameters:
+
+  ClusterName:
+    Type: String 
+    Description:  Name of the EKS cluster we will be installing karpenter on.  Used to name resources.  
+    Default:  primary
+
+  NodeRoleName:
+    Type: String 
+    Description:  IAM roles NAME (NOT ARN!) of the role we wish karpenter-provisioned instances to assume.  
+    Default:  primary-EKSNodeRole
+
+
+
+Resources:
+
+  KarpenterControllerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${ClusterName}-KarpenterControllerPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Resource: "*"
+            Action:
+              # Write Operations
+              - ec2:CreateLaunchTemplate
+              - ec2:CreateFleet
+              - ec2:RunInstances
+              - ec2:CreateTags
+              - iam:PassRole
+              - ec2:TerminateInstances
+              # Read Operations
+              - ec2:DescribeLaunchTemplates
+              - ec2:DescribeInstances
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeInstanceTypes
+              - ec2:DescribeInstanceTypeOfferings
+              - ec2:DescribeAvailabilityZones
+              - ssm:GetParameter
+
+
+  # InstanceProfile to be attached to Karpenter-provisioned EC2 instances.
+  KarpenterInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${ClusterName}-KarpenterInstanceProfile
+      Path: /
+      Roles: [ !Ref NodeRoleName]
