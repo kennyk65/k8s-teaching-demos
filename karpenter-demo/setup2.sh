@@ -2,22 +2,28 @@
 # BASED ON:  https://karpenter.sh/docs/getting-started/
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 AWS_ACCOUNT_ID=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
+read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
-read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
-read -p 'Enter a comma-separated list of subnet IDs: ' SUBNET_IDS
-read -p 'Enter the name of the IAM role used by the cluster nodes ['${CLUSTER_NAME}-EKSNodeRole']: ' NODE_ROLE
+read -p 'Enter nodegroup name ['${CLUSTER_NAME}'-NodeGroup]: ' NODE_GROUP_NAME
+#read -p 'Enter a comma-separated list of subnet IDs: ' SUBNET_IDS
+read -p 'Enter the name of the IAM role used by the cluster nodes ['${CLUSTER_NAME}'-EKSNodeRole]: ' NODE_ROLE
 AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
 NODE_ROLE=${NODE_ROLE:-${CLUSTER_NAME}'-EKSNodeRole'}
-
-echo Using values:  
-echo Account: $AWS_ACCOUNT_ID, Region: $AWS_REGION, Cluster: $CLUSTER_NAME
-echo Subnets: $SUBNET_IDS
-echo Node Role: $NODE_ROLE
+NODE_GROUP_NAME=${NODE_GROUP_NAME:-${CLUSTER_NAME}'-NodeGroup'}
 
 # Set region
-echo Setting region to $AWS_REGION
 aws configure set region $AWS_REGION
+
+SUBNET_IDS=$(aws eks describe-nodegroup --cluster-name $CLUSTER_NAME --nodegroup-name  $NODE_GROUP_NAME --query 'nodegroup.subnets' --output text)
+#echo Subnets from API call: $TEMP_SUBNETS
+
+echo 
+echo Using values:  
+echo Account: $AWS_ACCOUNT_ID, Region: $AWS_REGION, Cluster: $CLUSTER_NAME, NodeGroup: $NODE_GROUP_NAME
+echo Subnets: $SUBNET_IDS
+echo Node Role: $NODE_ROLE
+echo 
 
 # Install Kubectl, if needed.
 if ! command -v kubectl &> /dev/null
@@ -30,6 +36,10 @@ else
     echo Looks like kubectl is already installed.
 fi
 kubectl version --short --client
+
+# Configure kubeconfig
+echo Configuring kubeconfig file for cluster $CLUSTER_NAME
+aws eks update-kubeconfig --name $CLUSTER_NAME 
 
 # Install eksctl, if needed.
 if ! command -v eksctl &> /dev/null
@@ -55,37 +65,9 @@ else
 fi
 
 
-# # Create cluster using eksctl.  Expect this to wait even after CloudFormation is finished.
-# # The withOIDC setting is interesting.  Karpenter will run in a pod and needs to make AWS API calls.
-# cat <<EOF > cluster.yaml
-# ---
-# apiVersion: eksctl.io/v1alpha5
-# kind: ClusterConfig
-# metadata:
-#   name: ${CLUSTER_NAME}
-#   region: ${AWS_DEFAULT_REGION}
-#   version: "1.21"
-# managedNodeGroups:
-#   - instanceType: t3.small
-#     amiFamily: AmazonLinux2
-#     name: ${CLUSTER_NAME}-ng
-#     desiredCapacity: 1
-#     minSize: 1
-#     maxSize: 10
-# iam:
-#   withOIDC: true
-# EOF
-# eksctl create cluster -f cluster.yaml
-
-# Get the subnets created by eksctl and tag them so karpenter can find them:
-echo Tagging subnets to be used by karpenter: $ SUBNET_IDS
-# SUBNET_IDS=$(aws cloudformation describe-stacks \
-#     --stack-name eksctl-ec2-user-karpenter-demo-cluster \
-#     --query 'Stacks[].Outputs[?OutputKey==`SubnetsPrivate`].OutputValue' \
-#     --output text)
-aws ec2 create-tags \
-    --resources $(echo $SUBNET_IDS | tr ',' '\n') \
-    --tags Key="kubernetes.io/cluster/${CLUSTER_NAME}",Value=
+echo Tagging subnets to be used by karpenter: $SUBNET_IDS
+aws ec2 create-tags --resources $SUBNET_IDS --tags Key="kubernetes.io/cluster/${CLUSTER_NAME}",Value=
+#aws ec2 create-tags --resources subnet-e58222bc subnet-954347f3 --tags Key="test",Value=    
 
 # Use CloudFormation to quickly create some extra resources:
 # Create a managed policy to be used by Karpenter
@@ -96,7 +78,7 @@ Resources:
   KarpenterControllerPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: ${ClusterName}-KarpenterControllerPolicy
+      ManagedPolicyName: ${CLUSTER_NAME}-KarpenterControllerPolicy
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -122,28 +104,22 @@ Resources:
   KarpenterInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: ${ClusterName}-KarpenterInstanceProfile
+      InstanceProfileName: ${CLUSTER_NAME}-KarpenterInstanceProfile
       Path: /
       Roles: [ ${NODE_ROLE} ]
 EOF
-aws cloudformation deploy --stack-name Karpenter-${CLUSTER_NAME} --template-file extra-resources-template.yaml   --capabilities CAPABILITY_NAMED_IAM 
+aws cloudformation deploy --stack-name karpenter-${CLUSTER_NAME} --template-file extra-resources-template.yaml   --capabilities CAPABILITY_NAMED_IAM 
 
-# # This maps the new role to an RBAC group.  The new nodes will use this role, existing nodes won't (weird)
-# # TODO: I SHOULD BE ABLE TO REPLACE THIS WITH THE EXISTING ROLE USED BY THE NODEGROUP.
-# # THE EXISTING ROLE USED BY THE NODEGROUP IS ALREADY MAPPED
-# eksctl create iamidentitymapping \
-#   --username system:node:{{EC2PrivateDNSName}} \
-#   --cluster  ${CLUSTER_NAME} \
-#   --arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole-${CLUSTER_NAME} \
-#   --group system:bootstrappers \
-#   --group system:nodes
 
-# This service account will be used by code in the pod to make AWS API calls to facilitate scaling.
+echo Enable OpenID Connect on the cluster
+eksctl utils associate-iam-oidc-provider --cluster=${CLUSTER_NAME} --approve
+
+echo Create an RBAC service account associated with IAM Role.  It will be used by code in the pod to make AWS API calls to facilitate scaling.
 eksctl create iamserviceaccount --cluster $CLUSTER_NAME --namespace karpenter --name karpenter  \
-  --attach-policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/${ClusterName}-KarpenterControllerPolicy \
+  --attach-policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/${CLUSTER_NAME}-KarpenterControllerPolicy \
   --approve
 
-# Install Karpenter itself using Helm:
+echo Install Karpenter itself using Helm:
 helm repo add karpenter https://charts.karpenter.sh
 helm repo update
 helm upgrade --install karpenter karpenter/karpenter --namespace karpenter \
@@ -152,7 +128,7 @@ helm upgrade --install karpenter karpenter/karpenter --namespace karpenter \
   --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.endpoint" --output json) \
   --wait # for the defaulting webhook to install before creating a Provisioner
 
-# Create a 'provisioner'.  Note this one is using spot instances:
+echo Create a karpenter provisioner.  Note this one is using spot instances:
 cat <<EOF | kubectl apply -f -
 apiVersion: karpenter.sh/v1alpha5
 kind: Provisioner
@@ -167,7 +143,7 @@ spec:
     resources:
       cpu: 1000
   provider:
-    instanceProfile: ${ClusterName}-KarpenterInstanceProfile
+    instanceProfile: ${CLUSTER_NAME}-KarpenterInstanceProfile
   ttlSecondsAfterEmpty: 30
 EOF
 
