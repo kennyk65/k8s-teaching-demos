@@ -42,17 +42,17 @@ Parameters:
 
   ExercisesDockerImageDownload:
     Type: String
-    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/cn120-exercises-cnc-2.9.0.tgz
+    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/cn120-exercises-cnc-2.11.0.tgz
     Description: Image to use for the docker container to host the exercise files.  Expected to be a tgz file with a docker image inside. 
 
   ExercisesDockerImageName:
     Type: String
-    Default: mirantistraining/cn120-exercises:cnc-2.9.0
+    Default: mirantistraining/cn120-exercises:cnc-2.11.0
     Description: Docker image name contained within the tgz file. 
 
   SlidesDockerImageDownload:
     Type: String
-    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/slides-cnc-2.9.0.tgz
+    Default: https://kk-courses.s3.amazonaws.com/k8s-cn120/slides-cnc-2.11.0.tgz
     Description: Image to use for the docker container to host the slide presentation.  Expected to be a tgz file with a docker image inside. 
 
   AmazonLinuxAMI:
