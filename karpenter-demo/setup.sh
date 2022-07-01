@@ -1,5 +1,6 @@
 #!/bin/bash
 # BASED ON:  https://karpenter.sh/docs/getting-started/
+# Use this script to create a NEW EKS cluster and install Karpenter
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 TEMP_ACCOUNT=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
