@@ -15,11 +15,10 @@ AWS_ROLENAME=`echo $AWS_ROLEARN|awk -F/ '{print $2}'`
 echo Setting region to $AWS_REGION
 aws configure set region $AWS_REGION
 
-# Alter the role associated with the Cloud9 EC2 instance.  Have it match the role that created the cluster.
-# This code assumes the instance profile already exists due to the trust policy in the Role itself.
+echo  Altering the role associated with the Cloud9 EC2 instance.  Have it match the role that created the cluster.
 aws ec2 associate-iam-instance-profile --instance-id $INSTANCE_ID --iam-instance-profile Name=$AWS_ROLENAME
-
-# Disable Cloud9's Managed Credentials.  They are incompatible with identies known to the EKS Cluster
+ 
+echo  Disable Cloud9s Managed Credentials.  They are incompatible with identies known to the EKS Cluster
 aws cloud9 update-environment --environment-id $C9_PID --managed-credentials-action DISABLE
 
 # Kubectl
