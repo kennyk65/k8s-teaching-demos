@@ -1,4 +1,5 @@
 #!/bin/bash
+INSTANCE_ID=`curl -s http://169.254.169.254/latest/meta-data/instance-id`
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 TEMP_ACCOUNT=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
 TEMP_ROLEARN=arn:aws:iam::$TEMP_ACCOUNT:role/EksClusterCreatorRole
@@ -8,10 +9,18 @@ read -p 'Enter Role ARN of cluster creator ['${TEMP_ROLEARN}']: ' AWS_ROLEARN
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
 AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
 AWS_ROLEARN=${AWS_ROLEARN:-${TEMP_ROLEARN}}
+AWS_ROLENAME=`echo $AWS_ROLEARN|awk -F/ '{print $2}'`
 
 # Set region
 echo Setting region to $AWS_REGION
 aws configure set region $AWS_REGION
+
+# Alter the role associated with the Cloud9 EC2 instance.  Have it match the role that created the cluster.
+# This code assumes the instance profile already exists due to the trust policy in the Role itself.
+aws ec2 associate-iam-instance-profile --instance-id $INSTANCE_ID --iam-instance-profile Name=$AWS_ROLENAME
+
+# Disable Cloud9's Managed Credentials.  They are incompatible with identies known to the EKS Cluster
+aws cloud9 update-environment --environment-id $C9_PID --managed-credentials-action DISABLE
 
 # Kubectl
 if ! command -v kubectl &> /dev/null
