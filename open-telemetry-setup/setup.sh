@@ -1,4 +1,6 @@
-# AWS Distro for OpenTelemetry (ADOT) prerequisites
+# Setup AWS Distro for OpenTelemetry (ADOT).  
+# TODO:  The Prometheus open telemetry collector needs an "endpoint".  Don't know what to use.  Opened support ticket.
+# TODO:  The CloudWatch collector doesn't produce any metric results, although there are some logs.
 
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
@@ -17,7 +19,7 @@ kubectl version | grep "Server Version"
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.2/cert-manager.yaml
 
 # Verify ready:
-kubectl get pod -w -n cert-manager
+kubectl get pod  -n cert-manager
 
 # To create an IAM OIDC identity provider for your cluster with eksctl
 # See https://docs.aws.amazon.com/eks/latest/userguide/enable-iam-roles-for-service-accounts.html
@@ -29,23 +31,21 @@ aws iam list-open-id-connect-providers | grep $oidc_id
 # Create an IAM OIDC identity provider for your cluster 
 eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve
 
-# Create IAM Role for ADOT, see https://docs.aws.amazon.com/eks/latest/userguide/adot-iam.html
+# Create IAM Role to support the AWS Distro for OpenTelemetry (ADOT), see https://docs.aws.amazon.com/eks/latest/userguide/adot-iam.html
 eksctl create iamserviceaccount --name adot-collector --namespace default --cluster $CLUSTER_NAME \
     --attach-policy-arn arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess \
     --attach-policy-arn arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess \
     --attach-policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
     --approve --override-existing-serviceaccounts
 
-# Create the ADOT, see https://docs.aws.amazon.com/eks/latest/userguide/adot-manage.html
+# Create the AWS Distro for OpenTelemetry (ADOT) operator, see https://docs.aws.amazon.com/eks/latest/userguide/adot-manage.html
 aws eks create-addon --addon-name adot --cluster-name $CLUSTER_NAME
 aws eks describe-addon --addon-name adot --cluster-name $CLUSTER_NAME
 
 # Deploy Open Telemetry Collector.  See https://docs.aws.amazon.com/eks/latest/userguide/deploy-deployment.html
 cat <<EOF > collector-config-amp.yaml
-#
 # OpenTelemetry Collector configuration
 # Metrics pipeline with Prometheus Receiver and Prometheus Remote Write Exporter sending metrics to Amazon Managed Prometheus
-#
 ---
 apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
@@ -726,7 +726,6 @@ spec:
                 new_label: EKS_Namespace               
 
     exporters:
-      #
       # AWS EMF exporter that sends metrics data as performance log events to Amazon CloudWatch
       # Only the metrics that were filtered out by the processors get to this stage of the pipeline
       # Under the metric_declarations field, add one or more sets of Amazon CloudWatch dimensions
@@ -735,7 +734,6 @@ spec:
       # Metrics names may be listed explicitly or using regular expressions
       # A default list of metrics has been provided
       # Data from performance log events will be aggregated by Amazon CloudWatch using these dimensions to create an Amazon CloudWatch custom metric
-      #    
       awsemf:
         region: "$AWS_REGION"
         namespace: ContainerInsights/Prometheus
@@ -802,4 +800,12 @@ subjects:
     namespace: default
 EOF
 kubectl apply -f collector-config-cw.yaml 
+
+
+#  INSTALL SAMPLE APP:  See https://docs.aws.amazon.com/eks/latest/userguide/sample-app.html
+curl -o traffic-generator.yaml https://raw.githubusercontent.com/aws-observability/aws-otel-community/master/sample-configs/traffic-generator.yaml
+kubectl apply -f traffic-generator.yaml
+curl -o sample-app.yaml https://raw.githubusercontent.com/aws-observability/aws-otel-community/master/sample-configs/sample-app.yaml
+sed -i "s~<YOUR_AWS_REGION>~$AWS_REGION~g" sample-app.yaml
+kubectl apply -f sample-app.yaml
 
