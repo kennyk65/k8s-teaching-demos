@@ -9,40 +9,40 @@ CLUSTER_NAME=${CLUSTER_NAME:-primary}
 AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
 
 
-# Grant permissions to Amazon EKS add-ons to install ADOT:
+echo Grant permissions to Amazon EKS add-ons to install ADOT:
 kubectl apply -f https://amazon-eks.s3.amazonaws.com/docs/addons-otel-permissions.yaml
 
-#  Version must be 1.19 or higher:
+echo Version must be 1.19 or higher:
 kubectl version | grep "Server Version"
 
-# Install Cert Manager:
+echo Install Cert Manager:
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.2/cert-manager.yaml
 
-# Verify ready:
+echo Verify ready:
 kubectl get pod  -n cert-manager
 
-# To create an IAM OIDC identity provider for your cluster with eksctl
+echo Create an IAM OIDC identity provider for your cluster with eksctl
 # See https://docs.aws.amazon.com/eks/latest/userguide/enable-iam-roles-for-service-accounts.html
 oidc_id=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
 
 # Determine whether an IAM OIDC provider with your cluster's ID is already in your account.
 aws iam list-open-id-connect-providers | grep $oidc_id
 
-# Create an IAM OIDC identity provider for your cluster 
+echo Create an IAM OIDC identity provider for your cluster 
 eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve
 
-# Create IAM Role to support the AWS Distro for OpenTelemetry (ADOT), see https://docs.aws.amazon.com/eks/latest/userguide/adot-iam.html
+echo Create IAM Role to support the AWS Distro for OpenTelemetry (ADOT), see https://docs.aws.amazon.com/eks/latest/userguide/adot-iam.html
 eksctl create iamserviceaccount --name adot-collector --namespace default --cluster $CLUSTER_NAME \
     --attach-policy-arn arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess \
     --attach-policy-arn arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess \
     --attach-policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
     --approve --override-existing-serviceaccounts
 
-# Create the AWS Distro for OpenTelemetry (ADOT) operator, see https://docs.aws.amazon.com/eks/latest/userguide/adot-manage.html
+echo Create the AWS Distro for OpenTelemetry (ADOT) operator, see https://docs.aws.amazon.com/eks/latest/userguide/adot-manage.html
 aws eks create-addon --addon-name adot --cluster-name $CLUSTER_NAME
 aws eks describe-addon --addon-name adot --cluster-name $CLUSTER_NAME
 
-# Deploy Open Telemetry Collector.  See https://docs.aws.amazon.com/eks/latest/userguide/deploy-deployment.html
+echo Deploy Open Telemetry Collector from prometheus.  See https://docs.aws.amazon.com/eks/latest/userguide/deploy-deployment.html
 cat <<EOF > collector-config-amp.yaml
 # OpenTelemetry Collector configuration
 # Metrics pipeline with Prometheus Receiver and Prometheus Remote Write Exporter sending metrics to Amazon Managed Prometheus
@@ -407,7 +407,7 @@ EOF
 kubectl apply -f collector-config-amp.yaml 
 
 
-# Deploy the AWS Distro for OpenTelemetry Collector for CloudWatch
+echo Deploy the AWS Distro for OpenTelemetry Collector for CloudWatch
 # See https://docs.aws.amazon.com/eks/latest/userguide/configure-cw.html
 cat <<EOF > collector-config-cw.yaml
 # OpenTelemetry Collector configuration
@@ -801,8 +801,7 @@ subjects:
 EOF
 kubectl apply -f collector-config-cw.yaml 
 
-
-#  INSTALL SAMPLE APP:  See https://docs.aws.amazon.com/eks/latest/userguide/sample-app.html
+echo Install a Sample App to generate traffic.  See https://docs.aws.amazon.com/eks/latest/userguide/sample-app.html
 curl -o traffic-generator.yaml https://raw.githubusercontent.com/aws-observability/aws-otel-community/master/sample-configs/traffic-generator.yaml
 kubectl apply -f traffic-generator.yaml
 curl -o sample-app.yaml https://raw.githubusercontent.com/aws-observability/aws-otel-community/master/sample-configs/sample-app.yaml
