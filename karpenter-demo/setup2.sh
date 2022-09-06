@@ -1,5 +1,6 @@
 #!/bin/bash
 # BASED ON:  https://karpenter.sh/docs/getting-started/
+# Use this script with an EXISTING EKS cluster and install Karpenter
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
 AWS_ACCOUNT_ID=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
 read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
@@ -15,6 +16,7 @@ NODE_GROUP_NAME=${NODE_GROUP_NAME:-${CLUSTER_NAME}'-NodeGroup'}
 # Set region
 aws configure set region $AWS_REGION
 
+# Get subnets used by existing cluster:
 SUBNET_IDS=$(aws eks describe-nodegroup --cluster-name $CLUSTER_NAME --nodegroup-name  $NODE_GROUP_NAME --query 'nodegroup.subnets' --output text)
 #echo Subnets from API call: $TEMP_SUBNETS
 
@@ -114,7 +116,7 @@ aws cloudformation deploy --stack-name karpenter-${CLUSTER_NAME} --template-file
 echo Enable OpenID Connect on the cluster
 eksctl utils associate-iam-oidc-provider --cluster=${CLUSTER_NAME} --approve
 
-echo Create an RBAC service account associated with IAM Role.  It will be used by code in the pod to make AWS API calls to facilitate scaling.
+echo Create an RBAC service account associated with IAM Role.  It will be used by code in the provisioner to make AWS API calls to facilitate scaling.
 eksctl create iamserviceaccount --cluster $CLUSTER_NAME --namespace karpenter --name karpenter  \
   --attach-policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/${CLUSTER_NAME}-KarpenterControllerPolicy \
   --approve
@@ -122,8 +124,8 @@ eksctl create iamserviceaccount --cluster $CLUSTER_NAME --namespace karpenter --
 echo Install Karpenter itself using Helm:
 helm repo add karpenter https://charts.karpenter.sh
 helm repo update
-helm upgrade --install karpenter karpenter/karpenter --namespace karpenter \
-  --create-namespace --set serviceAccount.create=false --version 0.5.0 \
+helm upgrade --install karpenter karpenter/karpenter --create-namespace --namespace karpenter \
+  --set serviceAccount.create=false --version 0.5.0 \
   --set controller.clusterName=${CLUSTER_NAME} \
   --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${CLUSTER_NAME} --query "cluster.endpoint" --output json) \
   --wait # for the defaulting webhook to install before creating a Provisioner
