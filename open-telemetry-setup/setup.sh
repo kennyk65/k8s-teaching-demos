@@ -8,17 +8,25 @@ read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
 CLUSTER_NAME=${CLUSTER_NAME:-primary}
 AWS_REGION=${AWS_REGION:-${TEMP_REGION}}
 
+echo Replacing AWS CLI v1 with v2
+pip uninstall awscli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
 
-echo Grant permissions to Amazon EKS add-ons to install ADOT:
+echo Create Prometheus workspace and get the URL.
+WORKSPACE_ID=$(aws amp create-workspace --alias prometheus-workspace --query workspaceId --output text)
+WORKSPACE_URL=$(aws amp describe-workspace --workspace-id $WORKSPACE_ID --query workspace.prometheusEndpoint --output text)
+WORKSPACE_URL=${WORKSPACE_URL}v1/remote_write
+echo The Prometheus workspace URL is $WORKSPACE_URL
+
+echo Prerequisite - Grant permissions to Amazon EKS add-ons to install AWS Distro for OpenTelemetry ADOT:
 kubectl apply -f https://amazon-eks.s3.amazonaws.com/docs/addons-otel-permissions.yaml
-
-echo Version must be 1.19 or higher:
-kubectl version | grep "Server Version"
 
 echo Install Cert Manager:
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.2/cert-manager.yaml
 
-echo Verify ready:
+echo Verify that the Cert manager is ready.  Should see pods running:
 kubectl get pod  -n cert-manager
 
 echo Create an IAM OIDC identity provider for your cluster with eksctl
@@ -350,7 +358,7 @@ spec:
 
     exporters:
       prometheusremotewrite:
-        endpoint: <YOUR_REMOTE_WRITE_ENDPOINT>
+        endpoint: $WORKSPACE_URL
         auth:
           authenticator: sigv4auth
 
@@ -812,3 +820,7 @@ curl -o sample-app.yaml https://raw.githubusercontent.com/aws-observability/aws-
 sed -i "s~<YOUR_AWS_REGION>~$AWS_REGION~g" sample-app.yaml
 kubectl apply -f sample-app.yaml
 
+
+echo Verify that any of this is working
+pip install awscurl
+awscurl --service="aps" --region="$AWS_REGION" "https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$WORKSPACE_ID/api/v1/query?query=20 "
