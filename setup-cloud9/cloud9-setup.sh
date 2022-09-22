@@ -35,7 +35,9 @@ kubectl version --short --client
 
 # Configure kubeconfig
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
-aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
+# Should use the credentials of the instance to avoid IAM Role self-assume
+aws eks update-kubeconfig --name $CLUSTER_NAME --alias admin --region $AWS_REGION
+#aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
 #aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
 # eksctl
