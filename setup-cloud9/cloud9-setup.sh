@@ -25,7 +25,8 @@ aws cloud9 update-environment --environment-id $C9_PID --managed-credentials-act
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
-    curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl    
+    # curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+    curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.13/2022-10-31/bin/linux/amd64/kubectl 
     chmod +x ./kubectl
     sudo mv ./kubectl /usr/local/bin
 else
