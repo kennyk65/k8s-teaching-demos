@@ -1,5 +1,7 @@
 # Setup AWS Distro for OpenTelemetry (ADOT).  
+# Based on https://docs.aws.amazon.com/eks/latest/userguide/opentelemetry.html
 # TODO:  The Prometheus open telemetry collector needs an "endpoint".  Don't know what to use.  Opened support ticket.
+# TODO:  The Prometheus open telemetry collector install fails with: "error: unable to recognize "collector-config-amp.yaml": no matches for kind "OpenTelemetryCollector" in version "opentelemetry.io/v1alpha1"".  ticket opened.
 # TODO:  The CloudWatch collector doesn't produce any metric results, although there are some logs.
 
 TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
@@ -822,5 +824,8 @@ kubectl apply -f sample-app.yaml
 
 
 echo Verify that any of this is working
-pip install awscurl
+pip3 install awscurl 
 awscurl --service="aps" --region="$AWS_REGION" "https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$WORKSPACE_ID/api/v1/query?query=20 "
+
+awscurl -X POST --region $AWS_REGION --service aps "https://aps-workspaces.$AWS_REGION.amazonaws.com/workspaces/$WORKSPACE_ID/api/v1/query?query=20"
+                                                    https://aps-workspaces.us-west-2.amazonaws.com/workspaces/ws-85d2551d-ec3a-44ab-8870-7ae9d05a3372/api/v1/query
