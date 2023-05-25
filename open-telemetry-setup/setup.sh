@@ -1,6 +1,5 @@
 # Setup AWS Distro for OpenTelemetry (ADOT).  
 # Based on https://docs.aws.amazon.com/eks/latest/userguide/opentelemetry.html
-# TODO:  The Prometheus open telemetry collector needs an "endpoint".  Don't know what to use.  Opened support ticket.
 # TODO:  The Prometheus open telemetry collector install fails with: "error: unable to recognize "collector-config-amp.yaml": no matches for kind "OpenTelemetryCollector" in version "opentelemetry.io/v1alpha1"".  ticket opened.
 # TODO:  The CloudWatch collector doesn't produce any metric results, although there are some logs.
 
