@@ -57,12 +57,7 @@ echo Grafana Workspace Endpoint is $AMG_WORKSPACE_ENDPOINT
 
 # TODO:  DETERMINE HOW TO ASSOCIATE GRAFANA WITH IDENTITY CENTER USER OR GROUP.  opened support ticket
 # TODO:  DETERMINE HOW TO GET GRAFANA PLUGGED INTO PROMETHEUS SERVER.  opened support ticket
-aws identitystore describe-user --identity-store-id d-926702ccce --user-id kennyk
-
-aws identitystore get-user-id --identity-store-id d-926702ccce --alternate-identifier kennyk
-
-
-
-aws grafana update-permissions --workspace-id $AMG_WORKSPACE_ID --update-instruction-batch action=ADD,role=ADMIN,users=[{id=kennyk,type=SSO_USER}]
-
-aws grafana update-permissions --workspace-id $AMG_WORKSPACE_ID --update-instruction-batch "[{\"action\":\"ADD\",\"role\":\"ADMIN\",\"users\":[{\"id\":\"kennyk\",\"type\":\"SSO_USER\"}]}]"
+# TODO:  TEST THIS
+IDENTITY_CENTER_GROUP=$(aws identitystore list-groups --identity-store-id $IDENTITY_STORE_ID --output text --query "Groups[?contains(DisplayName,'main')].GroupId")
+aws grafana update-permissions --workspace-id $AMG_WORKSPACE_ID --update-instruction-batch action=ADD,role=ADMIN,users=[{id=$IDENTITY_CENTER_GROUP,type=SSO_GROUP}]
+aws grafana update-permissions --workspace-id $AMG_WORKSPACE_ID --update-instruction-batch "[{\"action\":\"ADD\",\"role\":\"ADMIN\",\"users\":[{\"id\":\"$IDENTITY_CENTER_GROUP\",\"type\":\"SSO_GROUP\"}]}]"
