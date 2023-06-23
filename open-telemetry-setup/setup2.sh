@@ -1,7 +1,7 @@
 # Setup AWS Distro for OpenTelemetry (ADOT).  
 # Based on https://catalog.workshops.aws/eks-immersionday/en-US/monitoring
 
-TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+TEMP_REGION=$(curl http://169.254.169.254/latest/meta-data/placement/region -s)
 read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
 CLUSTER_NAME=${CLUSTER_NAME:-primary}

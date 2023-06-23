@@ -1,5 +1,5 @@
 #!/bin/bash
-TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+TEMP_REGION=$(curl http://169.254.169.254/latest/meta-data/placement/region -s)
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME
 read -p 'Enter region ['${TEMP_REGION}']: ' AWS_REGION
 CLUSTER_NAME=${CLUSTER_NAME:-primary}

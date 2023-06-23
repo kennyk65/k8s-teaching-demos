@@ -1,6 +1,6 @@
 #!/bin/bash
 INSTANCE_ID=`curl -s http://169.254.169.254/latest/meta-data/instance-id`
-TEMP_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+TEMP_REGION=$(curl http://169.254.169.254/latest/meta-data/placement/region -s)
 TEMP_ACCOUNT=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
 TEMP_ROLEARN=arn:aws:iam::$TEMP_ACCOUNT:role/EksClusterCreatorRole
 read -p 'Enter cluster name [primary]: ' CLUSTER_NAME

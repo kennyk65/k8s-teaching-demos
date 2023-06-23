@@ -1,7 +1,7 @@
 
 # NOTE: This Grafana setup will only work if you are using Identity Center for SSO to AWS accounts
 
-AWS_REGION==`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep region|awk -F\" '{print $4}'`
+AWS_REGION=$(curl http://169.254.169.254/latest/meta-data/placement/region -s)
 ACCOUNT_ID=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document|grep accountId|awk -F\" '{print $4}'`
 CLUSTER_NAME=primary
 IDENTITY_STORE_ID=$(aws sso-admin list-instances --output text --query Instances[0].IdentityStoreId)
