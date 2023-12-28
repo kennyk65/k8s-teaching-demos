@@ -26,13 +26,15 @@ if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
     # curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.13/2022-10-31/bin/linux/amd64/kubectl 
-    curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-08-16/bin/linux/amd64/kubectl
+    # curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-08-16/bin/linux/amd64/kubectl
+    curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.28.3/2023-11-14/bin/linux/amd64/kubectl
+
     chmod +x ./kubectl
     sudo mv ./kubectl /usr/local/bin
 else
     echo Looks like kubectl is already installed.
 fi
-kubectl version --short --client
+kubectl version --client
 
 # Configure kubeconfig
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
