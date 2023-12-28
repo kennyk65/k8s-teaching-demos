@@ -25,7 +25,6 @@ aws cloud9 update-environment --environment-id $C9_PID --managed-credentials-act
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
-    # curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.13/2022-10-31/bin/linux/amd64/kubectl 
     # curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-08-16/bin/linux/amd64/kubectl
     curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.28.3/2023-11-14/bin/linux/amd64/kubectl
 
@@ -47,7 +46,8 @@ aws eks update-kubeconfig --name $CLUSTER_NAME --alias admin --region $AWS_REGIO
 if ! command -v eksctl &> /dev/null
 then
     echo Installing eksctl
-    curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+    #curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+    curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
     sudo mv /tmp/eksctl /usr/local/bin
 else
     echo Looks like eksctl is already installed.
