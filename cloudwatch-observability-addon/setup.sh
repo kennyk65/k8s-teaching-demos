@@ -15,4 +15,6 @@ aws iam attach-role-policy --role-name $AWS_ROLE --policy-arn arn:aws:iam::aws:p
 aws iam attach-role-policy --role-name $AWS_ROLE --policy-arn arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
 
 # Install the addon:
-aws eks create-addon --addon-name amazon-cloudwatch-observability --cluster-name $CLUSTER_NAME
+#aws eks create-addon --addon-name amazon-cloudwatch-observability --cluster-name $CLUSTER_NAME
+# TODO: UNTESTED CODE.  SEE SUPPORT ISSUE 170377686801544
+aws eks create-addon --addon-name amazon-cloudwatch-observability --addon-version v1.2.0-eksbuild.1 --cluster-name $CLUSTER_NAME 
