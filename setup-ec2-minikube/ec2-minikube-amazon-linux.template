@@ -1,0 +1,97 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+# This sets up minikube on an EC2 Amazon Linux instance.
+# Note: There is a bit of unavoidable work you have to do after you connect to the instance,
+# You must launch Docker and Minikube from a non-root user to avoid some issues:
+#
+# sudo usermod -aG docker $(whoami) && sudo newgrp docker
+# su - ssm-user
+# sudo systemctl start docker
+# sudo systemctl enable docker
+# minikube start
+#
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "Please supply the following"
+        Parameters: 
+          - VPC
+          - PublicSubnet
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC, one with public subnets
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Select a public subnet in your selected VPC.  The web server will run here.
+
+
+Resources:
+
+  # Security Group for the web server.  Allow HTTP from anywhere:
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Web server
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: WebServerSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+
+  # Minikube Instance:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"  # Obtain the AMI from the SSM Parameter
+      InstanceType: t3.large              # Minikube requires 2 vcpus, 2 GB memory, 20 GB volume
+      IamInstanceProfile: !Ref InstanceProfile     # Allows EC2 Instance to talk with SSM
+      NetworkInterfaces:
+      - DeviceIndex: 0
+        AssociatePublicIpAddress: true            # We will need a public IP address
+        SubnetId: !Ref PublicSubnet               # We should sit in a public subnet.
+        GroupSet: [ !Ref WebServerSecurityGroup ] # Attach the security group
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+      Tags:
+      - Key: Name
+        Value: Minikube
+      UserData:      #  This code installs a demo Java/Spring app.  Then it signals completion:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          echo Installing and starting Docker
+          yum install -y docker
+
+          echo Install kubectl
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+
+          echo Install Minikube
+          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+          install minikube-linux-amd64 /usr/local/bin/minikube
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: 
+        - ec2RoleForSsm     # Should be existing role
+
+Outputs:
+
+  SessionManagerLink:
+    Description: Access Minikube instance via web browser
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/systems-manager/session-manager/${EC2Instance}?region=${AWS::Region}#  
+
