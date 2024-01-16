@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: 011673140073.dkr.ecr.us-west-2.amazonaws.com/myapp
+        image: public.ecr.aws/kkrueger/spring-cloud-aws-environment-demo:1
         ports:
         - containerPort: 80
