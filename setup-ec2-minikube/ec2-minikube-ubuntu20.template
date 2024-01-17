@@ -1,0 +1,176 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+# This sets up minikube on an EC2 instance running Ubuntu.
+# Based on https://dev.to/vinothmohan/setting-up-minikube-in-ec2-the-easy-way-22gi
+# and https://github.com/kunchalavikram1427/YouTube_Series/blob/main/Kubernetes/ClusterSetup/minikube-on-aws.md
+# TODO: PRESENTLY NOT WORKING.  THE CRIO-CONTAINERD SCRIPT PRODUCES AN ERROR.  SHOULDN'T HAVE TO BUILD THE SOFTWARE ANYWAY.
+
+# Note: The instance does not start minikube, you must do this yourself by running the following commands:
+#   sudo -i
+#   minikube start --vm-driver=none
+#   kubectl config view
+# Also, Session Manager on Ubuntu runs /bin/sh instead of /bin/bash, so to get up arrow, tab behavior, run "bash"
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "Please supply the following"
+        Parameters: 
+          - VPC
+          - PublicSubnet
+          - PrivateKeyName
+          - LinuxAMI
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC, one with public subnets
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Select a public subnet in your selected VPC.  The server will run here.
+
+  LinuxAMI:
+    Type:  AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id 
+    Description: You probably won't need to change this value.  This is looking up Ubuntu 20.04 AMI using the Parameter Store...
+
+
+Resources:
+
+  # Security Group for the server.  Allow SSH from anywhere:
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for server
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: MinikubeSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp   # open high order ports to accomodate NodePort services
+        FromPort: 30000
+        ToPort: 60000
+        CidrIp: 0.0.0.0/0
+
+
+  LaunchTemplateMinikube:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: !Sub ${AWS::StackName}-MinikubeTemplate
+      LaunchTemplateData: 
+        IamInstanceProfile: 
+          Name: !Ref SSMInstanceProfile  # Allows EC2 Instance to talk with SSM
+        ImageId: !Ref LinuxAMI             # Latest Ubuntu
+        InstanceType: t3.large              # Need a lot of RAM and CPU
+        NetworkInterfaces:
+        - DeviceIndex: 0
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnet           # You have to specify a subnet in this launch template, but this will be ignored when using ASG.
+          Groups: [!Ref ServerSecurityGroup]       # Plug in the security group.
+        InstanceMarketOptions: 
+          MarketType: spot
+        BlockDeviceMappings: 
+        - DeviceName: "/dev/xvdf"
+          Ebs:
+            VolumeSize: 25
+            VolumeType: gp2
+        UserData:   #  This code installs Minikube:
+          Fn::Base64: |
+            #!bin/bash
+            sudo apt update
+            sudo apt upgrade -y
+            sudo hostnamectl set-hostname minikube
+            sudo apt-get install -y apt-transport-https ca-certificates curl
+            sudo apt-get update -y &&  sudo apt-get install -y docker.io
+
+            echo install minikube
+            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+            sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+            echo Install kubectl
+            snap install kubectl --classic
+            # curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+            # chmod +x kubectl
+            # mv kubectl /usr/local/bin/
+            kubectl version --short --client
+
+            echo install conntrack
+            sudo apt install conntrack -y
+
+            echo install crictl
+            VERSION="v1.29.0" # check latest version in /releases page
+            wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz
+            sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin
+            rm -f crictl-$VERSION-linux-amd64.tar.gz
+
+            cat <<EOF | sudo tee /etc/crictl.yaml
+            runtime-endpoint: unix:///run/containerd/containerd.sock
+            image-endpoint: unix:///run/containerd/containerd.sock
+            timeout: 2
+            debug: false
+            pull-image-on-create: false
+            EOF
+
+            # echo install cri-dockerd
+            # apt install git -y
+            # git clone https://github.com/Mirantis/cri-dockerd.git
+            # ###Install GO###
+            # wget https://storage.googleapis.com/golang/getgo/installer_linux
+            # chmod +x ./installer_linux
+            # ./installer_linux
+            # source ~/.bash_profile
+            # mkdir bin
+            # VERSION=$((git describe --abbrev=0 --tags | sed -e 's/v//') || echo $(cat VERSION)-$(git log -1 --pretty='%h')) PRERELEASE=$(grep -q dev <<< "${VERSION}" && echo "pre" || echo "") REVISION=$(git log -1 --pretty='%h')
+            # go build -ldflags="-X github.com/Mirantis/cri-dockerd/version.Version='$VERSION}' -X github.com/Mirantis/cri-dockerd/version.PreRelease='$PRERELEASE' -X github.com/Mirantis/cri-dockerd/version.BuildTime='$BUILD_DATE' -X github.com/Mirantis/cri-dockerd/version.GitCommit='$REVISION'" -o cri-dockerd
+            # # Run these commands as root
+            # cd cri-dockerd
+            # mkdir bin
+            # go build -o bin/cri-dockerd
+            # mkdir -p /usr/local/bin
+            # install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+            # cp -a packaging/systemd/* /etc/systemd/system
+            # sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+            # systemctl daemon-reload
+            # systemctl enable cri-docker.service
+            # systemctl enable --now cri-docker.socket  
+
+
+
+  AppAutoScalingGroupMinikube:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: [ !Ref PublicSubnet ]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplateMinikube
+        Version: !GetAtt LaunchTemplateMinikube.LatestVersionNumber  
+      MinSize: 1
+      MaxSize: 1
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 300
+      Tags:
+      - Key: Name
+        Value: Minikube
+        PropagateAtLaunch: true
+
+  # Attach AmazonEC2RoleforSSM's permissions to each EC2 Instance in the ASG.
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [ !Ref SSMRole]
+
+  # Allow EC2 instance to make calls to SSM.
+  SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM

@@ -10,6 +10,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 # sudo systemctl start docker
 # sudo systemctl enable docker
 # minikube start
+# alias k="kubectl"
 #
 
 Metadata: 
@@ -47,13 +48,17 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp   # open high order ports to accomodate NodePort services
+        FromPort: 30000
+        ToPort: 60000
+        CidrIp: 0.0.0.0/0
 
   # Minikube Instance:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"  # Obtain the AMI from the SSM Parameter
-      InstanceType: t3.large              # Minikube requires 2 vcpus, 2 GB memory, 20 GB volume
+      InstanceType: t3.large              # Minikube requires 2 vcpus, 2 GB memory, 20 GB volume.  t3.medium is usually fine.
       IamInstanceProfile: !Ref InstanceProfile     # Allows EC2 Instance to talk with SSM
       NetworkInterfaces:
       - DeviceIndex: 0
@@ -67,12 +72,14 @@ Resources:
       Tags:
       - Key: Name
         Value: Minikube
-      UserData:      #  This code installs a demo Java/Spring app.  Then it signals completion:
+      - Key: Instructions
+        Value: See instructions at https://github.com/kennyk65/k8s-teaching-demos/blob/master/setup-ec2-minikube/ec2-minikube-amazon-linux.template
+      UserData:      #  This code installs a Docker, Kubectl, Minicube, but does not start them.
         Fn::Base64: |
           #!/bin/bash
           yum update -y
-          echo Installing and starting Docker
-          yum install -y docker
+          echo Installing Docker 
+          yum install -y docker 
 
           echo Install kubectl
           curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
@@ -82,6 +89,54 @@ Resources:
           echo Install Minikube
           curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
           install minikube-linux-amd64 /usr/local/bin/minikube
+
+          echo installing crictl
+          curl -LO https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.22.0/crictl-v1.22.0-linux-amd64.tar.gz
+          tar -zxvf crictl-v1.22.0-linux-amd64.tar.gz
+          mv crictl /usr/local/bin/
+
+          echo installing cri-dockerd
+          curl -LO https://github.com/Mirantis/cri-dockerd/releases/download/v1.2.3/cri-dockerd-1.2.3-linux-amd64
+          mv cri-dockerd-1.2.3-linux-amd64 /usr/local/bin/cri-dockerd
+          chmod +x /usr/local/bin/cri-dockerd
+
+          echo installing conntrack
+          yum install -y conntrack
+
+          echo installing cni-plugins
+          yum install -y cni-plugins
+
+          # echo installing 
+          # echo installing CNI Plugin
+          # CNI_PLUGIN_VERSION="1.4.0"
+          # CNI_PLUGIN_TAR="cni-plugins-linux-amd64-$CNI_PLUGIN_VERSION.tgz" # change arch if not on amd64
+          # CNI_PLUGIN_INSTALL_DIR="/opt/cni/bin"
+
+          # curl -LO "https://github.com/containernetworking/plugins/releases/download/$CNI_PLUGIN_VERSION/$CNI_PLUGIN_TAR"
+          # sudo mkdir -p "$CNI_PLUGIN_INSTALL_DIR"
+          # sudo tar -xf "$CNI_PLUGIN_TAR" -C "$CNI_PLUGIN_INSTALL_DIR"
+          # rm "$CNI_PLUGIN_TAR"
+
+          # echo install cri-o
+          # yum install -y yum-utils device-mapper-persistent-data lvm2
+          # yum-config-manager --add-repo=https://cbs.centos.org/repos/paas7-crio-113-candidate/x86_64/os/
+          # yum install -y cri-o
+
+          echo install cri-o
+          yum install -y libseccomp libassuan device-mapper-libs
+          curl -L -o /usr/local/bin/crio https://github.com/cri-o/cri-o/releases/download/v1.22.3/crio-v1.22.3-amd64
+          chmod +x /usr/local/bin/crio
+
+          # echo starting cri-o
+          # systemctl start crio
+          # systemctl enable crio
+
+          # echo starting docker
+          # systemctl start docker
+          # systemctl enable docker
+
+          # echo starting minikube
+          # minikube start --driver=none
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
