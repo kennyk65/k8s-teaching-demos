@@ -25,9 +25,7 @@ aws cloud9 update-environment --environment-id $C9_PID --managed-credentials-act
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
-    # curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-08-16/bin/linux/amd64/kubectl
     curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.28.3/2023-11-14/bin/linux/amd64/kubectl
-
     chmod +x ./kubectl
     sudo mv ./kubectl /usr/local/bin
 else
@@ -36,17 +34,15 @@ fi
 kubectl version --client
 
 # Configure kubeconfig
-echo Configuring kubeconfig file for cluster $CLUSTER_NAME
 # Should use the credentials of the instance to avoid IAM Role self-assume
+echo Configuring kubeconfig file for cluster $CLUSTER_NAME
 aws eks update-kubeconfig --name $CLUSTER_NAME --alias admin --region $AWS_REGION
 #aws eks update-kubeconfig --name $CLUSTER_NAME --role-arn $AWS_ROLEARN --alias admin --region $AWS_REGION
-#aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
 # eksctl
 if ! command -v eksctl &> /dev/null
 then
     echo Installing eksctl
-    #curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
     curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
     sudo mv /tmp/eksctl /usr/local/bin
 else
@@ -68,3 +64,5 @@ fi
 # Display your current identity in the log 
 echo Displaying current identity
 aws sts get-caller-identity 
+
+alias k=kubectl
