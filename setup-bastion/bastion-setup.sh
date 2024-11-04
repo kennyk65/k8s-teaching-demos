@@ -13,8 +13,7 @@ aws configure set region $AWS_REGION
 if ! command -v kubectl &> /dev/null
 then
     echo Installing Kubectl
-    # curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.17.9/2020-08-04/bin/linux/amd64/kubectl
-    curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+    curl --silent -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.28.3/2023-11-14/bin/linux/amd64/kubectl
     chmod +x ./kubectl
     sudo mv ./kubectl /usr/local/bin
 else
@@ -24,7 +23,7 @@ kubectl version --short --client
 
 # Configure kubeconfig
 echo Configuring kubeconfig file for cluster $CLUSTER_NAME
-aws eks update-kubeconfig --name $CLUSTER_NAME
+aws eks update-kubeconfig --name $CLUSTER_NAME --alias admin --region $AWS_REGION
 
 # eksctl
 if ! command -v eksctl &> /dev/null
