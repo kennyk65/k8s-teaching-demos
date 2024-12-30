@@ -20,4 +20,4 @@ spec:
         # Notice that actual value for image and tag is set dynamically by helm:
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}        
         ports:
-        - containerPort: 80
+        - containerPort: 8080
