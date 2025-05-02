@@ -1,0 +1,84 @@
+# This manifest contains all required k8s objects to install ADOT in a cluster.
+# ADOT is AWS's Distribution of Open Telemetry - used to collect metrics and traces.
+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: adot
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adot-collector-config
+  namespace: adot
+data:
+  collector.yaml: |
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'k8s-pods'
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+                  action: replace
+                  target_label: __address__
+                  regex: (.+)
+                  replacement: $1
+
+    exporters:
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          exporters: [prometheus]
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: adot-collector-sa
+  namespace: adot
+
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: adot-collector
+  namespace: adot
+spec:
+  selector:
+    matchLabels:
+      app: adot-collector
+  template:
+    metadata:
+      labels:
+        app: adot-collector
+    spec:
+      serviceAccountName: adot-collector-sa
+      containers:
+        - name: adot-collector
+          image: public.ecr.aws/aws-observability/aws-otel-collector:v0.27.0
+          command: ["/awscollector", "--config=/conf/collector.yaml"]
+          ports:
+            - containerPort: 8889
+              name: metrics
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+      volumes:
+        - name: config
+          configMap:
+            name: adot-collector-config
