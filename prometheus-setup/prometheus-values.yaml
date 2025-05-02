@@ -2,4 +2,4 @@ server:
   additionalScrapeConfigs:
     - job_name: 'adot-collector'
       static_configs:
-        - targets: ['adot-collector.adot.svc.cluster.local:8889']
+        - targets: ['adot-collector.monitoring.svc.cluster.local:8889']
