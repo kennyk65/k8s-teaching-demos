@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: backend
 spec:
-	type: LoadBalancer
-	selector:
-		app: webapp
-	ports:
-	- port: 80
-		targetPort: 80
-		protocol: TCP
+  type: LoadBalancer
+  selector:
+    app: webapp
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP

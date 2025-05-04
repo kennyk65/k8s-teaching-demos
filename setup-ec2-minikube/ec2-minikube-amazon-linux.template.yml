@@ -12,6 +12,8 @@ AWSTemplateFormatVersion: '2010-09-09'
 # minikube start
 # alias k="kubectl"
 #
+# for some demos you might want to clone my k8s demos from github:
+# git clone https://github.com/kennyk65/k8s-teaching-demos
 
 Metadata: 
   AWS::CloudFormation::Interface: 
@@ -61,6 +63,7 @@ Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
+      #ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"  # Obtain the AMI from the SSM Parameter
       ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"  # Obtain the AMI from the SSM Parameter
       InstanceType: t3.large              # Minikube requires 2 vcpus, 2 GB memory, 20 GB volume.  t3.medium is usually fine.
       IamInstanceProfile: !Ref InstanceProfile     # Allows EC2 Instance to talk with SSM
@@ -82,7 +85,7 @@ Resources:
         Fn::Base64: |
           #!/bin/bash
           yum update -y
-          echo Installing Docker 
+          yum install git -y
           yum install -y docker 
 
           echo Install kubectl
